@@ -14,7 +14,7 @@ require 'tumblr_client'
 
 
 class Options
-  attr_reader :offset, :posts
+  attr_reader :offset, :posts, :oauth_config
 
   def initialize (argv)
     init
@@ -25,12 +25,14 @@ class Options
   def init
     @offset = 0
     @posts = 100
+    @oauth_config = 'oauth_config.json'
   end
 
   def parse (argv)
     OptionParser.new do |opt|
-      opt.on('-p N_POSTS', '--posts N_POSTS',  'Number of posts') {|v| @posts = v.to_i }
-      opt.on('-o OFFSET', '--offset OFFSET',  'Offset (0 origin)') {|v| @offset = v.to_i }
+      opt.on('--posts N_POSTS',  'Number of posts') {|v| @posts = v.to_i }
+      opt.on('--offset OFFSET',  'Offset (0 origin)') {|v| @offset = v.to_i }
+      opt.on('--oauth-config FILEPATH',  'OAuth config filepath') {|v| @oauth_config = Pathname(v) }
       opt.parse!(argv)
     end
   end
@@ -86,6 +88,7 @@ end
 
 class App
   LIMIT = 200
+  INTERVAL = 10
 
   def initialize (oauth)
     Tumblr.configure do |c|
@@ -108,6 +111,8 @@ class App
     fetched_ids = {}
 
     while collected_posts < posts
+      sleep(INTERVAL) if collected_posts > 0
+
       STDERR.puts("[fetch] next_offset: #{next_offset}")
       url, fetched_posts = case target
                            when :dashboard
@@ -143,8 +148,9 @@ end
 
 
 if __FILE__ == $0
-  oauth_config = OAuthConfig.load_from_file(Pathname('oauth_config.json'))
   option = Options.new(ARGV)
+
+  oauth_config = OAuthConfig.load_from_file(option.oauth_config)
 
   app = App.new(oauth_config)
   app.collect(posts: option.posts, offset: option.offset)
