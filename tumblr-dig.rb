@@ -87,7 +87,7 @@ end
 
 
 class App
-  LIMIT = 200
+  LIMIT = 20
   INTERVAL = 10
 
   def initialize (oauth)
@@ -114,11 +114,11 @@ class App
       sleep(INTERVAL) if collected_posts > 0
 
       STDERR.puts("[fetch] next_offset: #{next_offset}")
-      url, fetched_posts = case target
+      urls, fetched_posts = case target
                            when :dashboard
                              fetch_dashboard(offset: next_offset, fetched_ids: fetched_ids)
                            end
-      url.each {|it| STDOUT.puts(url) }
+      urls.each {|it| STDOUT.puts(it) }
 
       next_offset += fetched_posts
       collected_posts += fetched_posts
