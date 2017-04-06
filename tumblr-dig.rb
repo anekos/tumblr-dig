@@ -119,6 +119,7 @@ class App
                              fetch_dashboard(offset: next_offset, fetched_ids: fetched_ids)
                            end
       urls.each {|it| STDOUT.puts(it) }
+      STDOUT.flush
 
       next_offset += fetched_posts
       collected_posts += fetched_posts
