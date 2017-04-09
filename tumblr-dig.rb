@@ -67,7 +67,7 @@ class OAuthConfig < Struct.new(:consumer_key, :consumer_secret, :access_token, :
 
     request_token = consumer.get_request_token(:exclude_callback => true)
 
-    print('Open: ' + request_token.authorize_url)
+    puts('Open: ' + request_token.authorize_url)
     print('Input oauth_verifier: ')
 
     verifier = gets.strip
