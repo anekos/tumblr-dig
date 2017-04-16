@@ -107,7 +107,7 @@ class App
     STDERR.puts("[collect] offset: #{offset}, posts: #{posts}, target: #{target}")
 
     collected_posts = 0
-    next_offset = 0
+    next_offset = offset
     fetched_ids = {}
 
     while collected_posts < posts
