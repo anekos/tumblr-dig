@@ -14,7 +14,7 @@ require 'tumblr_client'
 
 
 class Options
-  attr_reader :offset, :posts, :oauth_config
+  attr_reader :offset, :posts, :oauth_config, :format, :reblog
 
   def initialize (argv)
     init
@@ -26,14 +26,65 @@ class Options
     @offset = 0
     @posts = 100
     @oauth_config = 'oauth_config.json'
+    @format = Format::Simple.new
+    @reblog = nil
   end
 
   def parse (argv)
     OptionParser.new do |opt|
       opt.on('--posts N_POSTS',  'Number of posts') {|v| @posts = v.to_i }
       opt.on('--offset OFFSET',  'Offset (0 origin)') {|v| @offset = v.to_i }
+      opt.on('--reblog ID/ReblogKey',  'Reblog') do
+        |v|
+        if m = v.match(/\A(\d+)\/(.+)\z/)
+          @reblog = {:id => m[1].to_i, :reblog_key => m[2]}
+        else
+          raise "Invalid format: #{v}"
+        end
+      end
+      opt.on('--format "simple"|"chrysoberyl"',  'Output format') do
+        |v|
+        @format =
+          case v.downcase
+          when /\As(imple)?\z/
+            Format::Simple.new
+          when /\Ac(hrysoberyl)?\z/
+            Format::Chrysoberyl.new
+          else
+            raise "Unknown format: #{v}"
+          end
+      end
       opt.on('--oauth-config FILEPATH',  'OAuth config filepath') {|v| @oauth_config = Pathname(v) }
       opt.parse!(argv)
+    end
+  end
+end
+
+class Array
+  def shellescape
+    self.map(&:shellescape)
+  end
+end
+
+class Numeric
+  def shellescape
+    self.to_s.shellescape
+  end
+end
+
+class Entry < Struct.new(:url, :id, :reblog_key)
+end
+
+module Format
+  class Simple
+    def puts(entry)
+      STDOUT.puts(entry.url)
+    end
+  end
+
+  class Chrysoberyl
+    def puts(entry)
+      STDOUT.puts('@push-url --as image --meta id=%s --meta=reblog_key=%s %s' % [entry.id, entry.reblog_key, entry.url].shellescape)
     end
   end
 end
@@ -90,7 +141,7 @@ class App
   LIMIT = 20
   INTERVAL = 10
 
-  def initialize (oauth)
+  def initialize (oauth, format)
     Tumblr.configure do |c|
       c.consumer_key = oauth.consumer_key
       c.consumer_secret = oauth.consumer_secret
@@ -101,6 +152,12 @@ class App
     @client = Tumblr::Client.new
 
     @user_name = @client.info.dig('user', 'name')
+    @format= format
+  end
+
+  def reblog(param)
+    STDERR.puts("[reblog] id: #{param[:id]} reblog_key: #{param[:reblog_key]}")
+    @client.reblog(@user_name, param)
   end
 
   def collect(offset: 0, posts: 100, target: :dashboard)
@@ -114,11 +171,11 @@ class App
       sleep(INTERVAL) if collected_posts > 0
 
       STDERR.puts("[fetch] next_offset: #{next_offset}")
-      urls, fetched_posts = case target
+      entries, fetched_posts = case target
                            when :dashboard
                              fetch_dashboard(offset: next_offset, fetched_ids: fetched_ids)
                            end
-      urls.each {|it| STDOUT.puts(it) }
+      entries.each {|entry| @format.puts(entry) }
       STDOUT.flush
 
       next_offset += fetched_posts
@@ -132,18 +189,18 @@ class App
   def fetch_dashboard(offset: 0, fetched_ids: nil)
     posts = @client.dashboard(:type => 'photo', :limit => LIMIT, :offset => offset)['posts']
 
-    urls = posts.map do |post|
+    entries = posts.map do |post|
       if fetched_ids
         next [] if fetched_ids[post['id']]
         fetched_ids[post['id']] = true
       end
 
       post['photos'].map do |photo|
-        photo.dig('original_size', 'url')
+        Entry.new(photo.dig('original_size', 'url'), post['id'], post['reblog_key'])
       end
     end.flatten
 
-    [urls, posts.size]
+    [entries, posts.size]
   end
 end
 
@@ -153,6 +210,10 @@ if __FILE__ == $0
 
   oauth_config = OAuthConfig.load_from_file(option.oauth_config)
 
-  app = App.new(oauth_config)
-  app.collect(posts: option.posts, offset: option.offset)
+  app = App.new(oauth_config, option.format)
+  if option.reblog
+    app.reblog(option.reblog)
+  else
+    app.collect(posts: option.posts, offset: option.offset)
+  end
 end
