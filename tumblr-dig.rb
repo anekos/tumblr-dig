@@ -190,6 +190,8 @@ class App
     posts = @client.dashboard(:type => 'photo', :limit => LIMIT, :offset => offset)['posts']
 
     entries = posts.map do |post|
+      next if post['blog_name'] == @user_name
+
       if fetched_ids
         next [] if fetched_ids[post['id']]
         fetched_ids[post['id']] = true
@@ -198,7 +200,7 @@ class App
       post['photos'].map do |photo|
         Entry.new(photo.dig('original_size', 'url'), post['id'], post['reblog_key'])
       end
-    end.flatten
+    end.compact.flatten
 
     [entries, posts.size]
   end
