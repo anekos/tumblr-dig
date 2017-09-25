@@ -72,7 +72,7 @@ class Numeric
   end
 end
 
-class Entry < Struct.new(:url, :id, :reblog_key)
+class Entry < Struct.new(:url, :id, :reblog_key, :blog_name)
 end
 
 module Format
@@ -84,7 +84,7 @@ module Format
 
   class Chrysoberyl
     def puts(entry)
-      STDOUT.puts('@push-url --as image --meta id=%s --meta=reblog_key=%s %s' % [entry.id, entry.reblog_key, entry.url].shellescape)
+      STDOUT.puts('@push-url --as image --meta id=%s --meta reblog_key=%s --meta blog_name=%s %s' % [entry.id, entry.reblog_key, entry.blog_name, entry.url].shellescape)
     end
   end
 end
@@ -198,7 +198,7 @@ class App
       end
 
       post['photos'].map do |photo|
-        Entry.new(photo.dig('original_size', 'url'), post['id'], post['reblog_key'])
+        Entry.new(photo.dig('original_size', 'url'), post['id'], post['reblog_key'], post['blog_name'])
       end
     end.compact.flatten
 
