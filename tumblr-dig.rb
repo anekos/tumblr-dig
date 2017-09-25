@@ -11,6 +11,7 @@ require 'pathname'
 require 'pp'
 require 'shellwords'
 require 'tumblr_client'
+require 'yaml'
 
 
 class Options
@@ -50,6 +51,8 @@ class Options
             Format::Simple.new
           when /\Ac(hrysoberyl)?\z/
             Format::Chrysoberyl.new
+          when /\Ay(aml)?\z/
+            Format::Yaml.new
           else
             raise "Unknown format: #{v}"
           end
@@ -72,7 +75,7 @@ class Numeric
   end
 end
 
-class Entry < Struct.new(:url, :id, :reblog_key, :blog_name)
+class Entry < Struct.new(:url, :post)
 end
 
 module Format
@@ -84,7 +87,21 @@ module Format
 
   class Chrysoberyl
     def puts(entry)
-      STDOUT.puts('@push-url --as image --meta id=%s --meta reblog_key=%s --meta blog_name=%s %s' % [entry.id, entry.reblog_key, entry.blog_name, entry.url].shellescape)
+      p = entry.post
+      line = '@push-url --as image'
+      %w[id reblog_key blog_name note_count].each do
+        |name|
+        line += " --meta #{name}=#{entry.post[name].to_s.shellescape}"
+      end
+      line += " #{entry.url}"
+      STDOUT.puts(line)
+    end
+  end
+
+  class Yaml
+    def puts(entry)
+      STDOUT.puts(YAML.dump(entry.post))
+      STDOUT.puts('')
     end
   end
 end
@@ -198,7 +215,7 @@ class App
       end
 
       post['photos'].map do |photo|
-        Entry.new(photo.dig('original_size', 'url'), post['id'], post['reblog_key'], post['blog_name'])
+        Entry.new(photo.dig('original_size', 'url'), post)
       end
     end.compact.flatten
 
