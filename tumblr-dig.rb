@@ -75,7 +75,7 @@ class Numeric
   end
 end
 
-class Entry < Struct.new(:url, :post)
+class Entry < Struct.new(:url, :post, :index)
 end
 
 module Format
@@ -93,7 +93,7 @@ module Format
         |name|
         line += " --meta #{name}=#{entry.post[name].to_s.shellescape}"
       end
-      line += " #{entry.url}"
+      line += " --meta index=#{entry.index} #{entry.url}"
       STDOUT.puts(line)
     end
   end
@@ -214,8 +214,8 @@ class App
         fetched_ids[post['id']] = true
       end
 
-      post['photos'].map do |photo|
-        Entry.new(photo.dig('original_size', 'url'), post)
+      post['photos'].map.with_index do |photo, index|
+        Entry.new(photo.dig('original_size', 'url'), post, index)
       end
     end.compact.flatten
 
