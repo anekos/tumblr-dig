@@ -15,7 +15,7 @@ require 'yaml'
 
 
 class Options
-  attr_reader :offset, :posts, :oauth_config, :format, :reblog
+  attr_reader :offset, :posts, :oauth_config, :format, :reblog, :post_image
 
   def initialize (argv)
     init
@@ -29,10 +29,14 @@ class Options
     @oauth_config = 'oauth_config.json'
     @format = Format::Simple.new
     @reblog = nil
+    @post_image = nil
   end
 
   def parse (argv)
     OptionParser.new do |opt|
+      caption = nil
+      host_page = nil
+
       opt.on('--posts N_POSTS',  'Number of posts') {|v| @posts = v.to_i }
       opt.on('--offset OFFSET',  'Offset (0 origin)') {|v| @offset = v.to_i }
       opt.on('--reblog ID/ReblogKey',  'Reblog') do
@@ -42,6 +46,12 @@ class Options
         else
           raise "Invalid format: #{v}"
         end
+      end
+      opt.on('--caption CAPTION',  'Caption for --post-image') {|v| caption = v}
+      opt.on('--host-page URL',  'Host page URL for --post-image') {|v| host_page = v}
+      opt.on('--post-image URL',  'Post Image') do
+        |v|
+        @post_image = {:source => v}
       end
       opt.on('--format "simple"|"chrysoberyl"',  'Output format') do
         |v|
@@ -59,6 +69,11 @@ class Options
       end
       opt.on('--oauth-config FILEPATH',  'OAuth config filepath') {|v| @oauth_config = Pathname(v) }
       opt.parse!(argv)
+
+      if @post_image
+        @post_image[:link] = host_page if host_page
+        @post_image[:caption] = caption if caption
+      end
     end
   end
 end
@@ -155,7 +170,6 @@ end
 
 
 class App
-  LIMIT = 20
   INTERVAL = 10
 
   def initialize (oauth, format)
@@ -175,6 +189,10 @@ class App
   def reblog(param)
     STDERR.puts("[reblog] id: #{param[:id]} reblog_key: #{param[:reblog_key]}")
     @client.reblog(@user_name, param)
+  end
+
+  def post_image(param)
+    @client.photo(@user_name, param)
   end
 
   def collect(offset: 0, posts: 100, target: :dashboard)
@@ -204,7 +222,7 @@ class App
 
   # [<URLs>, <Number of posts>]
   def fetch_dashboard(offset: 0, fetched_ids: nil)
-    posts = @client.dashboard(:type => 'photo', :limit => LIMIT, :offset => offset)['posts']
+    posts = @client.dashboard(:type => 'photo', :offset => offset)['posts']
 
     entries = posts.map do |post|
       next if post['blog_name'] == @user_name
@@ -232,6 +250,8 @@ if __FILE__ == $0
   app = App.new(oauth_config, option.format)
   if option.reblog
     app.reblog(option.reblog)
+  elsif option.post_image
+    app.post_image(option.post_image)
   else
     app.collect(posts: option.posts, offset: option.offset)
   end
