@@ -14,6 +14,23 @@ require 'tumblr_client'
 require 'yaml'
 
 
+# for before_id hack
+# https://qiita.com/newton/items/57ed217a7b486c2a52ba
+module Tumblr
+  module User
+
+    def info
+      get('v2/user/info')
+    end
+
+    def hacked_dashboard(options = {})
+      valid_opts = [:limit, :offset, :type, :since_id, :reblog_info, :notes_info, :before_id]
+      validate_options(valid_opts, options)
+      get('v2/user/dashboard', options)
+    end
+  end
+end
+
 class Options
   attr_reader :offset, :posts, :oauth_config, :format, :reblog, :post_image
 
@@ -195,25 +212,26 @@ class App
     @client.photo(@user_name, param)
   end
 
-  def collect(offset: 0, posts: 100, target: :dashboard)
+  def collect(offset: nil, posts: 100, target: :dashboard)
     STDERR.puts("[collect] offset: #{offset}, posts: #{posts}, target: #{target}")
 
     collected_posts = 0
     next_offset = offset
+    last_id = nil
     fetched_ids = {}
 
     while collected_posts < posts
       sleep(INTERVAL) if collected_posts > 0
 
-      STDERR.puts("[fetch] next_offset: #{next_offset}")
-      entries, fetched_posts = case target
+      STDERR.puts("[fetch] before_id: #{last_id}, offset: #{offset}")
+      entries, fetched_posts, last_id = case target
                            when :dashboard
-                             fetch_dashboard(offset: next_offset, fetched_ids: fetched_ids)
+                             fetch_dashboard(offset: next_offset, fetched_ids: fetched_ids, before_id: last_id)
                            end
       entries.each {|entry| @format.puts(entry) }
       STDOUT.flush
 
-      next_offset += fetched_posts
+      next_offset = nil
       collected_posts += fetched_posts
 
       STDERR.puts("[fetched] fetched_posts: #{fetched_posts}, collected_posts: #{collected_posts}")
@@ -221,8 +239,16 @@ class App
   end
 
   # [<URLs>, <Number of posts>]
-  def fetch_dashboard(offset: 0, fetched_ids: nil)
-    posts = @client.dashboard(:type => 'photo', :offset => offset)['posts']
+  def fetch_dashboard(offset: nil, fetched_ids: nil, before_id: nil)
+    param = {:type => 'photo'}
+
+    if before_id
+      param[:before_id] = before_id
+    elsif offset
+      param[:offset] = offset
+    end
+
+    posts = @client.hacked_dashboard(param)['posts']
 
     entries = posts.map do |post|
       next if post['blog_name'] == @user_name
@@ -237,7 +263,7 @@ class App
       end
     end.compact.flatten
 
-    [entries, posts.size]
+    [entries, posts.size, posts.last['id']]
   end
 end
 
