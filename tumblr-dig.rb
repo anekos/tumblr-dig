@@ -96,14 +96,20 @@ class Options
 end
 
 class Array
-  def shellescape
-    self.map(&:shellescape)
+  def escape
+    self.map(&:escape)
   end
 end
 
 class Numeric
-  def shellescape
-    self.to_s.shellescape
+  def escape
+    self.to_s.escape
+  end
+end
+
+class String
+  def escape
+    self.sub(/\n.*$/m, '').shellescape
   end
 end
 
@@ -121,11 +127,11 @@ module Format
     def puts(entry)
       p = entry.post
       line = '@push-url --as image'
-      %w[id reblog_key blog_name note_count].each do
+      %w[id reblog_key blog_name note_count summary].each do
         |name|
-        line += " --meta #{name}=#{entry.post[name].to_s.shellescape}"
+        line += " --meta #{name}=#{entry.post[name].to_s.escape}"
       end
-      line += " --meta index=#{entry.index} #{entry.url}"
+      line += " --meta index=#{entry.index} --meta tumblr=1 #{entry.url}"
       STDOUT.puts(line)
     end
   end
