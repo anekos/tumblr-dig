@@ -32,7 +32,7 @@ module Tumblr
 end
 
 class Options
-  attr_reader :offset, :posts, :oauth_config, :format, :reblog, :post_image, :before_id
+  attr_reader :offset, :posts, :oauth_config, :format, :reblog, :post_image, :before_id, :info
 
   def initialize (argv)
     init
@@ -57,6 +57,7 @@ class Options
       opt.on('--posts N_POSTS',  'Number of posts') {|v| @posts = v.to_i }
       opt.on('--offset OFFSET',  'Offset (0 origin)') {|v| @offset = v.to_i }
       opt.on('--before ID',  'ID') {|v| @before_id = v.to_i }
+      opt.on('--info') {|v| @info = true }
       opt.on('--reblog ID/ReblogKey',  'Reblog') do
         |v|
         if m = v.match(/\A(\d+)\/(.+)\z/)
@@ -248,6 +249,10 @@ class App
     @format.puts_error(result) unless ok?(result)
   end
 
+  def info
+    puts @client.info.to_json
+  end
+
   def collect(offset: nil, before_id: nil, posts: 100, target: :dashboard)
     STDERR.puts("[collect] offset: #{offset}, before_id: #{before_id}, posts: #{posts}, target: #{target}")
 
@@ -306,6 +311,7 @@ class App
   private
 
   def ok?(msg)
+    File.append('/tmp/xmosh/dig.log', msg.inspect + "\n")
     return true unless msg['status']
     msg['status'] == 200
   end
@@ -322,6 +328,8 @@ if __FILE__ == $0
     app.reblog(option.reblog)
   elsif option.post_image
     app.post_image(option.post_image)
+  elsif option.info
+    app.info()
   else
     app.collect(posts: option.posts, offset: option.offset, before_id: option.before_id)
   end
