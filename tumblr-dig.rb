@@ -1,6 +1,8 @@
 #!/usr/bin/ruby
 # vim: set fileencoding=utf-8 :
 
+# Tumblr API https://www.tumblr.com/docs/en/api/v2
+
 require 'find'
 require 'json'
 require 'oauth'
@@ -11,6 +13,7 @@ require 'pathname'
 require 'pp'
 require 'shellwords'
 require 'tumblr_client'
+require 'uri'
 require 'yaml'
 
 
@@ -68,9 +71,14 @@ class Options
       end
       opt.on('--caption CAPTION',  'Caption for --post-image') {|v| caption = v}
       opt.on('--host-page URL',  'Host page URL for --post-image') {|v| host_page = v}
-      opt.on('--post-image URL',  'Post Image') do
+      opt.on('--post-image <URL|LOCAL_FILE>',  'Post Image') do
         |v|
-        @post_image = {:source => v}
+        @post_image =
+          if File.exist?(v)
+            {:data => v}
+          else
+            {:source => v}
+          end
       end
       opt.on('--format "simple"|"chrysoberyl"',  'Output format') do
         |v|
@@ -126,15 +134,14 @@ end
 
 module Format
   class Base
+    def puts_last_id(id)
+      nil
+    end
   end
 
   class Simple < Base
     def puts(entry)
       STDOUT.puts(entry.url)
-    end
-
-    def puts_last_id(id)
-      nil
     end
 
     def puts_error(msg)
@@ -165,7 +172,7 @@ module Format
     end
   end
 
-  class Yaml
+  class Yaml < Base
     def puts(entry)
       STDOUT.puts(YAML.dump(entry.post))
       STDOUT.puts('')
@@ -294,6 +301,7 @@ class App
 
     entries = posts.map do |post|
       next if post['blog_name'] == @user_name
+      next if (post['trail'] || []).map {|it| it.dig('blog', 'name') } .any? {|it| it == @use_name }
 
       if fetched_ids
         next [] if fetched_ids[post['id']]
