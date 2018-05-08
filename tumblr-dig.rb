@@ -176,7 +176,7 @@ module Format
     end
 
     def phase(msg)
-      STDERR.puts(msg)
+      STDOUT.puts('# ' + msg)
     end
   end
 
