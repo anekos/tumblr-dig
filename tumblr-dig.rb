@@ -137,6 +137,10 @@ module Format
     def puts_last_id(id)
       nil
     end
+
+    def phase(msg)
+      STDOUT.puts(msg)
+    end
   end
 
   class Simple < Base
@@ -169,6 +173,10 @@ module Format
       shorten = msg.dig('errors', 0)
       shorten ||= msg
       STDOUT.puts("@message #{shorten.escape}")
+    end
+
+    def phase(msg)
+      STDERR.puts(msg)
     end
   end
 
@@ -246,7 +254,7 @@ class App
   end
 
   def reblog(param)
-    STDERR.puts("[reblog] id: #{param[:id]} reblog_key: #{param[:reblog_key]}")
+    @format.phase("[reblog] id: #{param[:id]} reblog_key: #{param[:reblog_key]}")
     result = @client.reblog(@user_name, param)
     @format.puts_error(result) unless ok?(result)
   end
@@ -261,7 +269,7 @@ class App
   end
 
   def collect(offset: nil, before_id: nil, posts: 100, target: :dashboard)
-    STDERR.puts("[collect] offset: #{offset}, before_id: #{before_id}, posts: #{posts}, target: #{target}")
+    @format.phase("[collect] offset: #{offset}, before_id: #{before_id}, posts: #{posts}, target: #{target}")
 
     collected_posts = 0
     next_offset = offset
@@ -271,7 +279,7 @@ class App
     while collected_posts < posts
       sleep(INTERVAL) if collected_posts > 0
 
-      STDERR.puts("[fetch] before_id: #{last_id}, offset: #{offset}")
+      @format.phase("[fetch] before_id: #{last_id}, offset: #{offset}")
       entries, fetched_posts, last_id = case target
                            when :dashboard
                              fetch_dashboard(offset: next_offset, fetched_ids: fetched_ids, before_id: last_id)
@@ -283,7 +291,7 @@ class App
       next_offset = nil
       collected_posts += fetched_posts
 
-      STDERR.puts("[fetched] fetched_posts: #{fetched_posts}, collected_posts: #{collected_posts}")
+      @format.phase("[fetched] fetched_posts: #{fetched_posts}, collected_posts: #{collected_posts}")
     end
   end
 
