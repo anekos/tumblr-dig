@@ -134,18 +134,30 @@ end
 
 module Format
   class Base
-    def puts_last_id(id)
+    def entry(it)
+      nil
+    end
+
+    def last_id(id)
       nil
     end
 
     def phase(msg)
-      STDOUT.puts(msg)
+      nil
+    end
+
+    def result (msg)
+      nil
     end
   end
 
   class Simple < Base
-    def puts(entry)
-      STDOUT.puts(entry.url)
+    def entry(it)
+      STDOUT.puts(it.url)
+    end
+
+    def phase(msg)
+      STDOUT.puts(msg)
     end
 
     def puts_error(msg)
@@ -154,18 +166,18 @@ module Format
   end
 
   class Chrysoberyl < Base
-    def puts(entry)
-      p = entry.post
+    def entry(it)
+      p = it.post
       line = '@push-url --as image'
       %w[id reblog_key blog_name note_count summary].each do
         |name|
-        line += " --meta #{name}=#{entry.post[name].to_s.escape}"
+        line += " --meta #{name}=#{it.post[name].to_s.escape}"
       end
-      line += " --meta index=#{entry.index} --meta tumblr=1 #{entry.url}"
+      line += " --meta index=#{it.index} --meta tumblr=1 #{it.url}"
       STDOUT.puts(line)
     end
 
-    def puts_last_id(id)
+    def last_id(id)
       STDOUT.puts("@set-env -p TUMBLR_LAST_ID #{id.to_s.escape}")
     end
 
@@ -178,11 +190,15 @@ module Format
     def phase(msg)
       STDOUT.puts('# ' + msg)
     end
+
+    def result(msg)
+      STDOUT.puts('# ' + msg.inspect)
+    end
   end
 
   class Yaml < Base
-    def puts(entry)
-      STDOUT.puts(YAML.dump(entry.post))
+    def entry(it)
+      STDOUT.puts(YAML.dump(it.post))
       STDOUT.puts('')
     end
   end
@@ -284,8 +300,8 @@ class App
                            when :dashboard
                              fetch_dashboard(offset: next_offset, fetched_ids: fetched_ids, before_id: last_id)
                            end
-      entries.each {|entry| @format.puts(entry) }
-      @format.puts_last_id(last_id)
+      entries.each {|entry| @format.entry(entry) }
+      @format.last_id(last_id)
       STDOUT.flush
 
       next_offset = nil
@@ -327,7 +343,7 @@ class App
   private
 
   def ok?(msg)
-    File.append('/tmp/xmosh/dig.log', msg.inspect + "\n")
+    @format.result(msg.inspect)
     return true unless msg['status']
     msg['status'] == 200
   end
